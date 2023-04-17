@@ -1,0 +1,24 @@
+{
+  "name": "ronggaapi",
+  "version": "1.0.0",
+  "description": "API Aplikasi Rombel Dengan Gaya Belajar",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aldisaepurahman/rongga_api.git"
+  },
+  "keywords": [
+    "rest",
+    "api",
+    "nodejs"
+  ],
+  "author": "Aldi Saepurahman",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/aldisaepurahman/rongga_api/issues"
+  },
+  "homepage": "https://github.com/aldisaepurahman/rongga_api#readme"
+}
