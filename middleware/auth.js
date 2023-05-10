@@ -2,9 +2,8 @@ var connection = require('../koneksi');
 var mysql = require('mysql');
 var md5 = require('md5');
 var response = require('../res');
-var jwt = require('jsonwebtoken');
-var config = require('../config/secret');
 var ip = require('ip');
+var resource = require('../config/resource');
 
 /* REGISTER */
 exports.registration = function (req, res) {
@@ -75,28 +74,7 @@ exports.registerStudent = function (req, res) {
                             if (error) {
                                 console.log(error);
                             } else {
-                                let access_token = jwt.sign({rows}, config.secret, {
-                                    expiresIn: 1440
-                                });
-                                let ip_address = ip.address();
-                
-                                query = "INSERT INTO access_token (id_users, access_token, ip_address) VALUES (?,?,?)";
-                                requests = [id_users, access_token, ip_address];
-                
-                                connection.query(query, requests, function (error, rows, fields) {
-                                    if (error) {
-                                        console.log(error);
-                                    } else {
-                                        res.json({
-                                            success: true,
-                                            message: "Token terdaftar!",
-                                            token: access_token,
-                                            current_user: id_users
-                                        });
-                                        // response.ok("Registrasi berhasil!", res);
-                                    }
-                                });
-                                // response.ok("Profil berhasil dilengkapi!", res);
+                                response.ok("Registrasi berhasil!", res);
                             }
                         });
                     }
@@ -144,29 +122,7 @@ exports.registerTeacher = function (req, res) {
                             if (error) {
                                 console.log(error);
                             } else {
-                                let access_token = jwt.sign({rows}, config.secret, {
-                                    expiresIn: 1440
-                                });
-                                let ip_address = ip.address();
-                
-                                query = "INSERT INTO access_token (id_users, access_token, ip_address) VALUES (?,?,?)";
-                                requests = [id_users, access_token, ip_address];
-                
-                                connection.query(query, requests, function (error, rows, fields) {
-                                    if (error) {
-                                        console.log(error);
-                                    } else {
-                                        res.json({
-                                            success: true,
-                                            message: "Token terdaftar!",
-                                            token: access_token,
-                                            current_user: id_users
-                                        });
-                                        // response.ok("Registrasi berhasil!", res);
-                                    }
-                                });
-
-                                // response.ok("Profil berhasil dilengkapi!", res);
+                                response.ok("Registrasi berhasil!", res);
                             }
                         });
                     }
@@ -189,39 +145,85 @@ exports.login = function (req, res) {
     let query = "SELECT * FROM users WHERE no_induk=? AND password=?";
     let requests = [no_induk, password];
 
-    connection.query(query, requests, function (error, rows, fields) {
+    connection.query(query, requests, async function (error, rows, fields) {
         if (error) {
             console.log(error);
         } else {
             if(rows.length === 1) {
-                let access_token = jwt.sign({rows}, config.secret, {
-                    expiresIn: 1440
-                });
+                let access_token = resource.getToken(rows);
                 let id_users = rows[0].id;
                 let ip_address = ip.address();
 
                 query = "INSERT INTO access_token (id_users, access_token, ip_address) VALUES (?,?,?)";
                 requests = [id_users, access_token, ip_address];
 
-                connection.query(query, requests, function (error, rows, fields) {
-                    if (error) {
-                        console.log(error);
-                    } else {
-                        res.json({
-                            success: true,
-                            message: "Token terdaftar!",
-                            token: access_token,
-                            current_user: id_users
-                        });
-                        // response.ok("Registrasi berhasil!", res);
+                await resource.expandedResult(query, requests);
+                let tahun_ajaran = await resource.expandedResult("SELECT * FROM tahun_ajaran WHERE aktif=1", []);
+                let view_data, wali_kelas;
+
+                if (rows[0].tipe_pengguna == 1) {
+                    view_data = await resource.expandedResult("SELECT * FROM view_siswa WHERE id=?", [id_users]);
+                } else if (rows[0].tipe_pengguna == 2) {
+                    view_data = await resource.expandedResult("SELECT * FROM view_guru WHERE id=?", [id_users]);
+                } else {
+                    view_data = [];
+                }
+
+                let userdata = {
+                    "id": rows[0].id,
+                    "no_induk": rows[0].no_induk,
+                    "nama": rows[0].nama,
+                    "email": rows[0].email,
+                    "password": rows[0].password,
+                    "gender": rows[0].gender,
+                    "no_telp": rows[0].no_telp,
+                    "photo": rows[0].photo,
+                    "alamat": rows[0].alamat,
+                    "tipe_pengguna": rows[0].tipe_pengguna,
+                    "id_sekolah": rows[0].id_sekolah,
+                };
+
+                if (rows[0].tipe_pengguna > 0) {
+                    if (Array.isArray(tahun_ajaran) && Array.isArray(view_data)) {
+                        if (rows[0].tipe_pengguna == 1) {
+                            userdata["id_siswa"] = view_data[0].id_siswa;
+                            userdata["tahun_masuk"] = view_data[0].tahun_masuk;
+                            userdata["status_awal_siswa"] = view_data[0].status_awal_siswa;
+                            userdata["tingkat"] = view_data[0].tingkat;
+                            userdata["deskripsi"] = view_data[0].deskripsi;
+                            userdata["rombel"] = view_data[0].rombel;
+                        } else {
+                            wali_kelas = await resource.expandedResult("SELECT * FROM rombel_wali_kelas WHERE id_guru=?", [view_data[0].id_guru]);
+
+                            userdata["id_guru"] = view_data[0].id_guru;
+                            userdata["status_ikatan_kerja"] = view_data[0].status_ikatan_kerja;
+                            userdata["spesialisasi"] = view_data[0].spesialisasi;
+                            userdata["kelompok_mapel"] = view_data[0].kelompok_mapel;
+
+                            if (Array.isArray(wali_kelas) && wali_kelas.length > 0) {
+                                userdata["wali_kelas"] = true;
+                            } else {
+                                userdata["wali_kelas"] = false;
+                            }
+                        }
                     }
+                }
+
+                userdata["id_tahun_ajaran"] = tahun_ajaran[0].id;
+                userdata["tahun_ajaran"] = tahun_ajaran[0].tahun_ajaran;
+                userdata["token"] = access_token;
+
+                res.json({
+                    success: true,
+                    message: "Login Sukses!",
+                    user_data: userdata,
                 });
             } else {
                 res.json({
                     success: false,
-                    message: "Email atau password salah!"
+                    message: "Email atau password salah!",
+                    user_data: {}
                 });
-                // response.ok("Nomor induk (NIS atau NIP) yang dimasukkan sudah terdaftar!", res);
             }
         }
     });

@@ -1,5 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
+const fileUpload = require('express-fileupload');
+const path = require('path');
 
 var morgan = require('morgan');
 const app = express();
@@ -8,6 +10,8 @@ const app = express();
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(bodyParser.json());
 app.use(morgan('dev'));
+app.use("/public", express.static(path.join(__dirname, 'public')));
+app.use(fileUpload());
 
 var routes = require('./routes');
 routes(app);

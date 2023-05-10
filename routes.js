@@ -62,4 +62,25 @@ module.exports = function(app){
         
     app.route('/rombelSiswa/delete')
         .delete(json.revertRombelSiswa);
+
+    app.route('/rombelWaliKelas/delete')
+        .delete(json.revertRombelWaliKelas);
+
+    app.route('/rombelWaliKelas/add')
+        .post(json.setWaliKelas);
+
+    app.route('/rombelSiswa/add')
+        .post(json.setRombelSiswa);
+
+    app.route('/nilaiSiswa/mapel')
+        .post(json.getAllMapel);
+    
+    app.route('/nilaiSiswa/exists')
+        .post(json.getAllExistingNilaiMapel);
+
+    app.route('/nilaiSiswa/add')
+        .post(json.addNilaiAkhirSiswa);
+
+    app.route('/kuesioner')
+        .post(json.testKuesioner);
 }
