@@ -2,6 +2,7 @@
 
 module.exports = function(app){
     var json = require('./controller');
+    var verification = require('./middleware/verification');
 
     app.route('/')
         .get(json.index);
@@ -12,75 +13,48 @@ module.exports = function(app){
      /searchStudent/:id
      */
 
-    app.route('/searchStudents')
-        .post(json.searchStudentDetails);
-
-    app.route('/searchTeacher')
-        .post(json.searchTeacher);
-
-    app.route('/editStudent')
-        .put(json.editStudent);
-
-    app.route('/editTeacher')
-        .put(json.editTeacher);
-
-    app.route('/changePassword')
-        .put(json.changePassword);
-
-    app.route('/tahunAjaran')
-        .get(json.showTahunAjaran);
-
-    app.route('/tahunAjaran/add')
-        .post(json.addTahunAjaran);
-
-    app.route('/tahunAjaran/edit')
-        .put(json.editTahunAjaran);
-
-    app.route('/tahunAjaran/delete')
-        .delete(json.deleteTahunAjaran);
-
-    app.route('/tahunAjaran/active')
-        .put(json.setActiveTahunAjaran);
-
-    app.route('/rombelSekolah')
-        .get(json.showRombelSekolah);
-
-    app.route('/rombelSekolah/add')
-        .post(json.addRombelSekolah);
-
-    app.route('/rombelSekolah/edit')
-        .put(json.editRombelSekolah);
-
-    app.route('/rombelSekolah/delete')
-        .delete(json.deleteRombelSekolah);
-        
-    app.route('/statusSiswa')
-        .get(json.getAllStatusSiswa);
-
-    app.route('/statusSiswa/add')
-        .post(json.setStatusSiswa);
-        
-    app.route('/rombelSiswa/delete')
-        .delete(json.revertRombelSiswa);
-
-    app.route('/rombelWaliKelas/delete')
-        .delete(json.revertRombelWaliKelas);
-
-    app.route('/rombelWaliKelas/add')
-        .post(json.setWaliKelas);
-
-    app.route('/rombelSiswa/add')
-        .post(json.setRombelSiswa);
-
-    app.route('/nilaiSiswa/mapel')
-        .post(json.getAllMapel);
+    app.post('/searchStudents', verification.verification, json.searchStudentDetails);
+    app.post('/searchTeacher', verification.verification, json.searchTeacher);
     
-    app.route('/nilaiSiswa/exists')
-        .post(json.getAllExistingNilaiMapel);
+    app.put('/editStudent', verification.verification, json.editStudent);
+    app.put('/editTeacher', verification.verification, json.editTeacher);
+    app.put('/changePassword', verification.verification, json.changePassword);
+    
+    app.post('/tahunAjaran/current', verification.verification, json.getCurrentTahunAjaran);
+    // app.route('/tahunAjaran/current')
+    //     .post(json.getCurrentTahunAjaran);
 
-    app.route('/nilaiSiswa/add')
-        .post(json.addNilaiAkhirSiswa);
+    app.post('/tahunAjaran/previous', verification.verification, json.getPreviousTahunAjaran);
 
-    app.route('/kuesioner')
-        .post(json.testKuesioner);
+    app.post('/tahunAjaran', verification.verification, json.showTahunAjaran);
+    app.post('/tahunAjaran/add', verification.verification, json.addTahunAjaran);
+    app.put('/tahunAjaran/edit', verification.verification, json.editTahunAjaran);
+    app.delete('/tahunAjaran/delete', verification.verification, json.deleteTahunAjaran);
+    app.put('/tahunAjaran/active', verification.verification, json.setActiveTahunAjaran);
+
+    app.post('/rombelSekolah', verification.verification, json.showRombelSekolah);
+    app.post('/rombelSekolah/add', verification.verification, json.addRombelSekolah);
+    app.put('/rombelSekolah/edit', verification.verification, json.editRombelSekolah);
+    app.delete('/rombelSekolah/delete', verification.verification, json.deleteRombelSekolah);
+        
+    app.get('/statusSiswa', verification.verification, json.getAllStatusSiswa);
+    app.post('/statusSiswa/add', verification.verification, json.setStatusSiswa);
+        
+    app.delete('/rombelSiswa/delete', verification.verification, json.revertRombelSiswa);
+    app.delete('/rombelWaliKelas/delete', verification.verification, json.revertRombelWaliKelas);
+    app.post('/rombelWaliKelas/add', verification.verification, json.setWaliKelas);
+    app.post('/rombelSiswa/add', verification.verification, json.setRombelSiswa);
+
+    app.post('/nilaiSiswa/mapel', verification.verification, json.getAllMapel);
+    app.post('/nilaiSiswa/all', verification.verification, json.getAllNilaiMapel);
+    app.post('/nilaiSiswa/exists', verification.verification, json.getAllExistingNilaiMapel);
+    app.post('/nilaiSiswa/add', verification.verification, json.addNilaiAkhirSiswa);
+
+    app.post('/kuesioner', verification.verification, json.testKuesioner);
+    app.post('/kuesioner/show', verification.verification, json.getTestResults);
+
+    app.post('/rombelSiswa/getAllSiswa', verification.verification, json.getSiswaTingkat);
+    app.post('/rombelSiswa/getAverage', verification.verification, json.getAverageNilaiAkhir);
+    app.post('/rombelSiswa/getAllTests', verification.verification, json.getAllTestResults); 
+    app.post('/rombelSiswa/showDetail', verification.verification, json.getRombelSearch);
 }

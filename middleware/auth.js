@@ -44,7 +44,7 @@ exports.registerStudent = function (req, res) {
     let no_induk = req.body.no_induk;
     let id_sekolah =  req.body.id_sekolah;
     let no_telp = req.body.no_telp;
-    let photo = req.body.photo;
+    let photo = "";
     let alamat = req.body.alamat;
     let status_awal_siswa = req.body.status_awal_siswa;
     let tahun_masuk = req.body.tahun_masuk;
@@ -58,27 +58,60 @@ exports.registerStudent = function (req, res) {
             console.log(error);
         } else {
             if (rows.length === 1) {
-                let id_users = rows[0].id;
+                let id_user = rows[0].id;
 
-                query = "UPDATE users SET no_telp=?, photo=?, alamat=?, id_sekolah=? WHERE id=?";
-                requests = [no_telp, photo, alamat, id_sekolah, id_users];
+                if (req.files) {
+                    let file = req.files.photo;
+                    let img_name = id_user + "_" + file.name;
+            
+                    file.mv('public/images/'+img_name, function (err) {
+                        if (err) {
+                            return res.status(500).send(err);
+                        } else {
+                            photo = img_name;
+            
+                            query = "UPDATE users SET no_telp=?, photo=?, alamat=?, id_sekolah=? WHERE id=?";
+                            requests = [no_telp, photo, alamat, id_sekolah, id_user];
 
-                connection.query(query, requests, function (error, rows, fields) {
-                    if (error) {
-                        console.log(error);
-                    } else {        
-                        query = "INSERT INTO siswa (id_users, tahun_masuk, status_awal_siswa, id_tingkat_siswa) VALUES (?,?,?,?)";
-                        requests = [id_users, tahun_masuk, status_awal_siswa, id_tingkat_kelas];
+                            connection.query(query, requests, function (error, rows, fields) {
+                                if (error) {
+                                    console.log(error);
+                                } else {        
+                                    query = "INSERT INTO siswa (id_users, tahun_masuk, status_awal_siswa, id_tingkat_siswa) VALUES (?,?,?,?)";
+                                    requests = [id_user, tahun_masuk, status_awal_siswa, id_tingkat_kelas];
 
-                        connection.query(query, requests, function (error, rows, fields) {
-                            if (error) {
-                                console.log(error);
-                            } else {
-                                response.ok("Registrasi berhasil!", res);
-                            }
-                        });
-                    }
-                });
+                                    connection.query(query, requests, function (error, rows, fields) {
+                                        if (error) {
+                                            console.log(error);
+                                        } else {
+                                            response.ok("Registrasi berhasil!", res);
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                    });
+                } else {
+                    query = "UPDATE users SET no_telp=?, photo=?, alamat=?, id_sekolah=? WHERE id=?";
+                    requests = [no_telp, photo, alamat, id_sekolah, id_user];
+
+                    connection.query(query, requests, function (error, rows, fields) {
+                        if (error) {
+                            console.log(error);
+                        } else {        
+                            query = "INSERT INTO siswa (id_users, tahun_masuk, status_awal_siswa, id_tingkat_siswa) VALUES (?,?,?,?)";
+                            requests = [id_user, tahun_masuk, status_awal_siswa, id_tingkat_kelas];
+
+                            connection.query(query, requests, function (error, rows, fields) {
+                                if (error) {
+                                    console.log(error);
+                                } else {
+                                    response.ok("Registrasi berhasil!", res);
+                                }
+                            });
+                        }
+                    });
+                }
             } else {
                 res.json({
                     success: false,
@@ -93,7 +126,7 @@ exports.registerTeacher = function (req, res) {
     let no_induk = req.body.no_induk;
     let id_sekolah =  req.body.id_sekolah;
     let no_telp = req.body.no_telp;
-    let photo = req.body.photo;
+    let photo = "";
     let alamat = req.body.alamat;
     let status_kerja = req.body.status_kerja;
     let id_mapel = req.body.id_mapel;
@@ -108,25 +141,58 @@ exports.registerTeacher = function (req, res) {
             if (rows.length === 1) {
                 let id_users = rows[0].id;
 
-                query = "UPDATE users SET no_telp=?, photo=?, alamat=?, id_sekolah=? WHERE id=?";
-                requests = [no_telp, photo, alamat, id_sekolah, id_users];
+                if (req.files) {
+                    let file = req.files.photo;
+                    let img_name = id_users + "_" + file.name;
+            
+                    file.mv('public/images/'+img_name, function (err) {
+                        if (err) {
+                            return res.status(500).send(err);
+                        } else {
+                            photo = img_name;
+            
+                            query = "UPDATE users SET no_telp=?, photo=?, alamat=?, id_sekolah=? WHERE id=?";
+                            requests = [no_telp, photo, alamat, id_sekolah, id_users];
 
-                connection.query(query, requests, function (error, rows, fields) {
-                    if (error) {
-                        console.log(error);
-                    } else {        
-                        query = "INSERT INTO guru (id_users, id_mapel, status_ikatan_kerja) VALUES (?,?,?)";
-                        requests = [id_users, id_mapel, status_kerja];
+                            connection.query(query, requests, function (error, rows, fields) {
+                                if (error) {
+                                    console.log(error);
+                                } else {        
+                                    query = "INSERT INTO guru (id_users, id_mapel, status_ikatan_kerja) VALUES (?,?,?)";
+                                    requests = [id_users, id_mapel, status_kerja];
 
-                        connection.query(query, requests, function (error, rows, fields) {
-                            if (error) {
-                                console.log(error);
-                            } else {
-                                response.ok("Registrasi berhasil!", res);
-                            }
-                        });
-                    }
-                });
+                                    connection.query(query, requests, function (error, rows, fields) {
+                                        if (error) {
+                                            console.log(error);
+                                        } else {
+                                            response.ok("Registrasi berhasil!", res);
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                    });
+                } else {
+                    query = "UPDATE users SET no_telp=?, photo=?, alamat=?, id_sekolah=? WHERE id=?";
+                    requests = [no_telp, photo, alamat, id_sekolah, id_users];
+
+                    connection.query(query, requests, function (error, rows, fields) {
+                        if (error) {
+                            console.log(error);
+                        } else {        
+                            query = "INSERT INTO guru (id_users, id_mapel, status_ikatan_kerja) VALUES (?,?,?)";
+                            requests = [id_users, id_mapel, status_kerja];
+
+                            connection.query(query, requests, function (error, rows, fields) {
+                                if (error) {
+                                    console.log(error);
+                                } else {
+                                    response.ok("Registrasi berhasil!", res);
+                                }
+                            });
+                        }
+                    });
+                }
             } else {
                 res.json({
                     success: false,
@@ -159,7 +225,7 @@ exports.login = function (req, res) {
 
                 await resource.expandedResult(query, requests);
                 let tahun_ajaran = await resource.expandedResult("SELECT * FROM tahun_ajaran WHERE aktif=1", []);
-                let view_data, wali_kelas;
+                let view_data, wali_kelas, kuesioner;
 
                 if (rows[0].tipe_pengguna == 1) {
                     view_data = await resource.expandedResult("SELECT * FROM view_siswa WHERE id=?", [id_users]);
@@ -192,6 +258,22 @@ exports.login = function (req, res) {
                             userdata["tingkat"] = view_data[0].tingkat;
                             userdata["deskripsi"] = view_data[0].deskripsi;
                             userdata["rombel"] = view_data[0].rombel;
+
+                            let thn_ajaran_tmp = tahun_ajaran[0].tahun_ajaran.split("/");
+
+                            for (let i = 0; i < thn_ajaran_tmp.length; i++) {
+                                thn_ajaran_tmp[i] = thn_ajaran_tmp[i] - "1";
+                            }
+
+                            userdata["prev_tahun_ajaran"] = thn_ajaran_tmp.join("/");
+
+                            kuesioner = await resource.expandedResult("SELECT * FROM view_test_results WHERE id_siswa=? AND id_tahun_ajaran=?", [view_data[0].id_siswa, tahun_ajaran[0].id]);
+
+                            if (Array.isArray(kuesioner) && kuesioner.length > 0) {
+                                userdata["kuesioner"] = 1;
+                            } else {
+                                userdata["kuesioner"] = 0;
+                            }
                         } else {
                             wali_kelas = await resource.expandedResult("SELECT * FROM rombel_wali_kelas WHERE id_guru=?", [view_data[0].id_guru]);
 
@@ -201,9 +283,9 @@ exports.login = function (req, res) {
                             userdata["kelompok_mapel"] = view_data[0].kelompok_mapel;
 
                             if (Array.isArray(wali_kelas) && wali_kelas.length > 0) {
-                                userdata["wali_kelas"] = true;
+                                userdata["wali_kelas"] = 1;
                             } else {
-                                userdata["wali_kelas"] = false;
+                                userdata["wali_kelas"] = 0;
                             }
                         }
                     }

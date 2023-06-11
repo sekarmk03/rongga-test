@@ -51,10 +51,31 @@ exports.searchStudentDetails = function (req, res) {
         }
     }
 
-    connection.query(query, requests, function (error, rows, fields) {
+    connection.query(query, requests, async function (error, rows, fields) {
         if (error) {
             console.log(error);
         } else {
+            let tahun_ajaran = await resource.expandedResult("SELECT * FROM tahun_ajaran WHERE aktif=1", []);
+
+            let thn_ajaran_tmp = tahun_ajaran[0].tahun_ajaran.split("/");
+
+            for (let i = 0; i < thn_ajaran_tmp.length; i++) {
+                thn_ajaran_tmp[i] = thn_ajaran_tmp[i] - "1";
+            }
+
+            for(let i=0;i<rows.length;i++) {
+                rows[i]['id_tahun_ajaran'] = tahun_ajaran[0].id;
+                rows[i]['tahun_ajaran'] = tahun_ajaran[0].tahun_ajaran;
+                rows[i]['prev_tahun_ajaran'] = thn_ajaran_tmp.join("/");
+
+                let kuesioner = await resource.expandedResult("SELECT * FROM view_test_results WHERE id_siswa=? AND id_tahun_ajaran=?", [rows[i].id_siswa, tahun_ajaran[0].id]);
+
+                if (Array.isArray(kuesioner) && kuesioner.length > 0) {
+                    rows[i]["kuesioner"] = 1;
+                } else {
+                    rows[i]["kuesioner"] = 0;
+                }
+            }
             //kalo post biasa response rows bisa diisi dengan string message dan res
             response.ok(rows, res)
         }
@@ -305,11 +326,47 @@ exports.changePassword = function (req, res) {
     });
 }
 
+exports.getCurrentTahunAjaran = function (req, res) {
+    let id_tahun_ajaran = req.body.id_tahun_ajaran;
+
+    let query = "SELECT * FROM tahun_ajaran WHERE id=?";
+    let requests = [id_tahun_ajaran];
+
+    connection.query(query, requests, function (error, rows, fields) {
+        if (error) {
+            console.log(error);
+        } else {
+            response.ok(rows, res);
+        }
+    });
+}
+
+exports.getPreviousTahunAjaran = function (req, res) {
+    let tahun_ajaran = req.body.tahun_ajaran;
+
+    let thn_ajaran_tmp = tahun_ajaran.split("/");
+
+    for (let i = 0; i < thn_ajaran_tmp.length; i++) {
+        thn_ajaran_tmp[i] = thn_ajaran_tmp[i] - "1";
+    }
+
+    let query = "SELECT * FROM tahun_ajaran WHERE tahun_ajaran=? AND semester LIKE '%Genap%'";
+    let requests = [thn_ajaran_tmp.join("/")];
+
+    connection.query(query, requests, function (error, rows, fields) {
+        if (error) {
+            console.log(error);
+        } else {
+            response.ok(rows, res);
+        }
+    });
+}
+
 /* ADMIN TAHUN AJARAN */
 exports.showTahunAjaran = function (req, res) {
-    let id_sekolah = req.params.id_sekolah;
+    let id_sekolah = req.body.id_sekolah;
 
-    let query = "SELECT * FROM tahun_ajaran WHERE id_sekolah=?";
+    let query = "SELECT * FROM tahun_ajaran WHERE id_sekolah=? ORDER BY tahun_ajaran DESC";
     let requests = [id_sekolah];
 
     connection.query(query, requests, function (error, rows, fields) {
@@ -377,10 +434,13 @@ exports.deleteTahunAjaran = function (req, res) {
     let query = "DELETE FROM tahun_ajaran WHERE id=?";
     let requests = [id_tahun_ajaran];
 
-    connection.query(query, requests, function (error, rows, fields) {
+    connection.query(query, requests, async function (error, rows, fields) {
         if (error) {
             console.log(error);
         } else {
+            let thn_ajaran_last = await resource.expandedResult("SELECT * FROM tahun_ajaran ORDER BY tahun_ajaran desc, semester desc limit 1", []);
+            await resource.expandedResult("UPDATE tahun_ajaran SET aktif=1 WHERE id=?", [thn_ajaran_last[0].id]);
+
             response.ok("Tahun Ajaran berhasil dihapus!", res);
         }
     });
@@ -398,7 +458,7 @@ exports.setActiveTahunAjaran = function (req, res) {
         if (error) {
             console.log(error);
         } else {
-            query = "UPDATE tahun_ajaran SET aktif=1 WHERE id_tahun_ajaran=?";
+            query = "UPDATE tahun_ajaran SET aktif=1 WHERE id=?";
             requests = [id_tahun_ajaran];
 
             connection.query(query, requests, function (error, rows, fields) {
@@ -413,11 +473,19 @@ exports.setActiveTahunAjaran = function (req, res) {
 }
 
 /* ADMIN ROMBEL SEKOLAH */
-exports.showRombelSekolah = function (req, res) {
-    let id_sekolah = req.params.id_sekolah;
+exports.showRombelSekolah = async function (req, res) {
+    let id_sekolah = req.body.id_sekolah;
+    let tingkat = 0;
 
     let query = "SELECT * FROM rombel_sekolah WHERE id_sekolah=?";
     let requests = [id_sekolah];
+
+    if (req.body.tingkat) {
+        tingkat = req.body.tingkat;
+        let tingkat_kelas = await resource.expandedResult("SELECT * FROM tingkat_kelas WHERE tingkat=?", [tingkat]);
+        query = "SELECT * FROM rombel_sekolah WHERE id_sekolah=? AND id_tingkat_kelas=?";
+        requests = [id_sekolah, tingkat_kelas[0].id];
+    }
 
     connection.query(query, requests, function (error, rows, fields) {
         if (error) {
@@ -548,15 +616,18 @@ exports.setStatusSiswa = function (req, res) {
 }
 
 /* REVERT ROMBEL SISWA */
-exports.revertRombelSiswa = function (req, res) {
+exports.revertRombelSiswa = async function (req, res) {
     let id_tahun_ajaran = req.body.id_tahun_ajaran;
     let id_sekolah = req.body.id_sekolah;
-    let id_tingkat_kelas = req.body.id_tingkat_kelas;
+    let tingkat = req.body.tingkat;
+
+    let queryTingkat = "SELECT * FROM tingkat_kelas WHERE tingkat = ?";
+    let tingkat_kelas = await resource.expandedResult(queryTingkat, [tingkat]);
 
     let query = "DELETE rombel_siswa FROM rombel_siswa INNER JOIN rombel_sekolah " +
-     "on rombel_siswa.id_rombel_sekolah = rombel_sekolah.id_rombel_sekolah " + 
+     "on rombel_siswa.id_rombel_sekolah = rombel_sekolah.id " + 
      "WHERE rombel_siswa.id_tahun_ajaran=? AND rombel_sekolah.id_sekolah=? AND rombel_sekolah.id_tingkat_kelas=?";
-    let requests = [id_tahun_ajaran, id_sekolah, id_tingkat_kelas];
+    let requests = [id_tahun_ajaran, id_sekolah, tingkat_kelas[0].id];
 
     connection.query(query, requests, function (error, rows, fields) {
         if (error) {
@@ -567,15 +638,18 @@ exports.revertRombelSiswa = function (req, res) {
     });
 }
 
-exports.revertRombelWaliKelas = function (req, res) {
+exports.revertRombelWaliKelas = async function (req, res) {
     let id_tahun_ajaran = req.body.id_tahun_ajaran;
     let id_sekolah = req.body.id_sekolah;
-    let id_tingkat_kelas = req.body.id_tingkat_kelas;
+    let tingkat = req.body.tingkat;
+
+    let queryTingkat = "SELECT * FROM tingkat_kelas WHERE tingkat = ?";
+    let tingkat_kelas = await resource.expandedResult(queryTingkat, [tingkat]);
 
     let query = "DELETE rombel_wali_kelas FROM rombel_wali_kelas INNER JOIN rombel_sekolah " +
-     "on rombel_wali_kelas.id_rombel_sekolah = rombel_sekolah.id_rombel_sekolah " + 
+     "on rombel_wali_kelas.id_rombel_sekolah = rombel_sekolah.id " + 
      "WHERE rombel_wali_kelas.id_tahun_ajaran=? AND rombel_sekolah.id_sekolah=? AND rombel_sekolah.id_tingkat_kelas=?";
-    let requests = [id_tahun_ajaran, id_sekolah, id_tingkat_kelas];
+    let requests = [id_tahun_ajaran, id_sekolah, tingkat_kelas[0].id];
 
     connection.query(query, requests, function (error, rows, fields) {
         if (error) {
@@ -618,8 +692,24 @@ exports.setRombelSiswa = function (req, res) {
 }
 
 /* INPUT NILAI AKHIR */
-exports.addNilaiAkhirSiswa = function (req, res) {
+exports.addNilaiAkhirSiswa = async function (req, res) {
     let nilai_akhir = req.body.nilai_akhir;
+    // let id_tahun_ajaran = req.body.id_tahun_ajaran;
+    // let prev_tahun_ajaran = "";
+
+    /* if (req.body.prev_tahun_ajaran) {
+        prev_tahun_ajaran = req.body.prev_tahun_ajaran;
+    } */
+
+    let thn_ajaran;
+
+    /* if (prev_tahun_ajaran.length > 0) {
+        thn_ajaran = await resource.expandedResult("SELECT * FROM tahun_ajaran WHERE tahun_ajaran=? AND semester LIKE '%Genap%'", [prev_tahun_ajaran]);
+        
+        if (Array.isArray(thn_ajaran) && thn_ajaran.length > 0) {
+            id_tahun_ajaran = thn_ajaran[0].id;
+        }
+    } */
 
     let query, requests;
     let successes = true;
@@ -630,12 +720,12 @@ exports.addNilaiAkhirSiswa = function (req, res) {
         query = "";
         requests = [];
 
-        if (nilai_akhir[i].id_nilai_akhir.length > 0) {
-            query = "UPDATE nilai_akhir_siswa SET id_mapel=?, id_siswa=?, id_tingkat_kelas=?, id_sekolah=?, id_tahun_ajaran=?, nilai=? WHERE id=?";
+        if (nilai_akhir[i].id > 0) {
+            query = "UPDATE nilai_akhir_mapel SET id_mapel=?, id_siswa=?, id_tingkat_kelas=?, id_sekolah=?, id_tahun_ajaran=?, nilai=? WHERE id=?";
             requests = [nilai_akhir[i].id_mapel, nilai_akhir[i].id_siswa, nilai_akhir[i].id_tingkat_kelas,
-                nilai_akhir[i].id_sekolah, nilai_akhir[i].id_tahun_ajaran, nilai_akhir[i].nilai, nilai_akhir[i].id_nilai_akhir];
+                nilai_akhir[i].id_sekolah, nilai_akhir[i].id_tahun_ajaran, nilai_akhir[i].nilai, nilai_akhir[i].id];
         } else {
-            query = "INSERT INTO nilai_akhir_siswa (id_mapel, id_siswa, id_tingkat_kelas, id_sekolah, id_tahun_ajaran, nilai) VALUES (?,?,?,?,?,?)";
+            query = "INSERT INTO nilai_akhir_mapel (id_mapel, id_siswa, id_tingkat_kelas, id_sekolah, id_tahun_ajaran, nilai) VALUES (?,?,?,?,?,?)";
             requests = [nilai_akhir[i].id_mapel, nilai_akhir[i].id_siswa, nilai_akhir[i].id_tingkat_kelas,
                 nilai_akhir[i].id_sekolah, nilai_akhir[i].id_tahun_ajaran, nilai_akhir[i].nilai];
         }
@@ -652,7 +742,7 @@ exports.addNilaiAkhirSiswa = function (req, res) {
         i++;
     }
 
-    if (nilai_akhir.length == moreSuccesses) {
+    if (successes) {
         response.ok("Nilai akhir berhasil ditambahkan!", res);
     } else {
         console.log("Nilai gagal ditambahkan!");
@@ -698,19 +788,77 @@ exports.getAllExistingNilaiMapel = async function (req, res) {
     }
     
     let query = "";
+    let query_mapel = "";
     let requests = [];
 
     if (rombel.length > 0 || tingkat > 7) {
         query = "SELECT * FROM tingkat_kelas WHERE tingkat = ?";
+        query_mapel = "SELECT * FROM mapel WHERE id_jenjang = 2 ORDER BY id_kelompok_mapel";
         requests = [tingkat];
     } else {
         query = "SELECT * FROM tingkat_kelas WHERE tingkat = 6";
+        query_mapel = "SELECT * FROM mapel WHERE id_jenjang = 1 ORDER BY id_kelompok_mapel";
+    }
+
+    if (rombel.length == 0) {
+        let thn_ajaran = await resource.expandedResult("SELECT * FROM tahun_ajaran WHERE id=?", [id_tahun_ajaran]);
+        let thn_ajaran_tmp = thn_ajaran[0].tahun_ajaran.split("/");
+
+        for (let i = 0; i < thn_ajaran_tmp.length; i++) {
+            thn_ajaran_tmp[i] = thn_ajaran_tmp[i] - "1";
+        }
+
+        thn_ajaran = await resource.expandedResult("SELECT * FROM tahun_ajaran WHERE tahun_ajaran=? AND semester LIKE '%Genap%'", [thn_ajaran_tmp.join("/")]);
+        id_tahun_ajaran = thn_ajaran[0].id;
     }
 
     let tingkat_kelas = await resource.expandedResult(query, requests);
+    let mapel = await resource.expandedResult(query_mapel, []);
 
-    query = "SELECT * FROM nilai_akhir WHERE id_tingkat_kelas=? AND id_siswa=? AND id_tahun_ajaran=? AND id_sekolah=?";
+    query = "SELECT * FROM nilai_akhir_mapel WHERE id_tingkat_kelas=? AND id_siswa=? AND id_tahun_ajaran=? AND id_sekolah=?";
     requests = [tingkat_kelas[0].id, id_siswa, id_tahun_ajaran, id_sekolah];
+
+    connection.query(query, requests, function (error, rows, fields) {
+        if (error) {
+            console.log(error);
+        } else {
+            let datarows = [];
+            for (let i=0; i<mapel.length; i++) {
+                let datamap = {
+                    'id':0,
+                    'id_mapel':parseInt(mapel[i].id),
+                    'nama_mapel': mapel[i].spesialisasi,
+                    'id_siswa': parseInt(id_siswa),
+                    'id_tingkat_kelas': parseInt(tingkat_kelas[0].id),
+                    'id_sekolah': parseInt(id_sekolah),
+                    'id_tahun_ajaran': id_tahun_ajaran,
+                    'nilai': 0
+                };
+                
+                let obj = rows.find((val, idx) => {
+                    if (val.id_mapel == mapel[i].id) {
+                        datamap['id'] = parseInt(val.id);
+                        datamap['nilai'] = parseInt(val.nilai);
+                        return true;
+                    }
+                });
+
+                datarows.push(datamap);
+            }
+            datarows.sort((a, b) => {
+                return a.id_mapel - b.id_mapel;
+            });
+
+            response.ok(datarows, res);
+        }
+    });
+}
+
+exports.getAllNilaiMapel = function (req, res) {
+    let id_sekolah = req.body.id_sekolah;
+
+    let query = "SELECT * FROM nilai_akhir_mapel WHERE id_sekolah=?";
+    let requests = [id_sekolah];
 
     connection.query(query, requests, function (error, rows, fields) {
         if (error) {
@@ -720,6 +868,7 @@ exports.getAllExistingNilaiMapel = async function (req, res) {
         }
     });
 }
+
 /* KUESIONER */
 exports.testKuesioner = function (req, res) {
     let kuesioner = req.body.kuesioner;
@@ -732,6 +881,140 @@ exports.testKuesioner = function (req, res) {
             console.log(error);
         } else {
             response.ok("Jawaban sudah tersimpan!", res);
+        }
+    });
+}
+
+exports.getTestResults = function (req, res) {
+    let id_siswa = req.body.id_siswa;
+    let tahun_ajaran = req.body.tahun_ajaran;
+
+    let query = "SELECT * FROM view_test_results WHERE id_siswa=? AND tahun_ajaran=?";
+    let requests = [id_siswa, tahun_ajaran];
+
+    connection.query(query, requests, function (error, rows, fields) {
+        if (error) {
+            console.log(error);
+        } else {
+            response.ok(rows, res);
+        }
+    });
+}
+
+exports.getSiswaTingkat = function (req, res) {
+    let tingkat = req.body.tingkat;
+    let id_sekolah = req.body.id_sekolah;
+
+    let query = "SELECT * FROM view_siswa WHERE tingkat=? AND id_sekolah=?";
+    let requests = [tingkat, id_sekolah];
+
+    connection.query(query, requests, function (error, rows, fields) {
+        if (error) {
+            console.log(error);
+        } else {
+            response.ok(rows, res);
+        }
+    });
+}
+
+exports.getAverageNilaiAkhir = async function (req, res) {
+    let tingkat = req.body.tingkat;
+    let id_tahun_ajaran = req.body.id_tahun_ajaran;
+    let id_sekolah = req.body.id_sekolah;
+    
+    let query = "";
+    let requests = [];
+
+    if (tingkat > 7) {
+        query = "SELECT * FROM tingkat_kelas WHERE tingkat = ?";
+        requests = [tingkat];
+    } else {
+        query = "SELECT * FROM tingkat_kelas WHERE tingkat = 6";
+    }
+
+    let thn_ajaran = await resource.expandedResult("SELECT * FROM tahun_ajaran WHERE id=?", [id_tahun_ajaran]);
+    console.log(id_tahun_ajaran);
+    let thn_ajaran_tmp = thn_ajaran[0].tahun_ajaran.split("/");
+
+    for (let i = 0; i < thn_ajaran_tmp.length; i++) {
+        thn_ajaran_tmp[i] = thn_ajaran_tmp[i] - "1";
+    }
+
+    thn_ajaran = await resource.expandedResult("SELECT * FROM tahun_ajaran WHERE tahun_ajaran=? AND semester LIKE '%Genap%'", [thn_ajaran_tmp.join("/")]);
+    id_tahun_ajaran = thn_ajaran[0].id;
+
+    let tingkat_kelas = await resource.expandedResult(query, requests);
+
+    query = "SELECT * FROM view_avg_nilai_akhir WHERE id_tingkat_kelas=? AND id_tahun_ajaran=? AND id_sekolah=? ORDER BY rata_rata DESC";
+    requests = [tingkat_kelas[0].id, id_tahun_ajaran, id_sekolah];
+
+    connection.query(query, requests, function (error, rows, fields) {
+        if (error) {
+            console.log(error);
+        } else {
+            response.ok(rows, res);
+        }
+    });
+}
+
+exports.getAllTestResults = function (req, res) {
+    let id_tahun_ajaran = req.body.id_tahun_ajaran;
+
+    let query = "SELECT * FROM view_test_results WHERE id_tahun_ajaran=?";
+    let requests = [id_tahun_ajaran];
+
+    connection.query(query, requests, function (error, rows, fields) {
+        if (error) {
+            console.log(error);
+        } else {
+            response.ok(rows, res);
+        }
+    });
+}
+
+exports.getRombelSearch = async function (req, res) {
+    let wali_kelas = req.body.wali_kelas;
+    let id_guru = req.body.id_guru;
+    let id_sekolah = req.body.id_sekolah;
+    let tingkat = req.body.tingkat;
+    let rombel = "";
+
+    let query = "";
+    let requests = [];
+    
+    if (req.body.rombel) {
+        rombel = req.body.rombel;
+    }
+    if (wali_kelas > 0) {
+        query = "SELECT rombel_sekolah.rombel FROM rombel_wali_kelas JOIN rombel_sekolah " +
+        "ON rombel_wali_kelas.id_rombel_sekolah = rombel_sekolah.id WHERE rombel_wali_kelas.id_guru = ?"
+        requests = [id_guru];
+        let rombel_wali = await resource.expandedResult(query, requests);
+        rombel = rombel_wali[0].rombel;
+    }
+
+    /* if (rombel.length > 0 && tingkat > 0) {
+        query = "SELECT * FROM view_siswa WHERE tingkat=? AND rombel=? AND id_sekolah=?";
+        requests = [tingkat, rombel, id_sekolah];
+    } else {
+        
+    } */
+    if (rombel.length > 0) {
+        query = "SELECT * FROM view_siswa WHERE rombel=? AND id_sekolah=?";
+        requests = [rombel, id_sekolah];
+    } else if (tingkat > 0) {
+        query = "SELECT * FROM view_siswa WHERE tingkat=? AND id_sekolah=?";
+        requests = [tingkat, id_sekolah];
+    } else {
+        query = "SELECT * FROM view_siswa WHERE id_sekolah=?";
+        requests = [id_sekolah];
+    }
+
+    connection.query(query, requests, function (error, rows, fields) {
+        if (error) {
+            console.log(error);
+        } else {
+            response.ok(rows, res);
         }
     });
 }
